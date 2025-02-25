@@ -7,10 +7,11 @@ use solana_program::{
     program_pack::{Pack, IsInitialized}, 
     pubkey::Pubkey, 
     stake::instruction,
-    sysvar::{rent::Rent, Sysvar},
+    sysvar::{rent::Rent, Sysvar}, 
 };
 
-use crate::{error::EscrowError, instruction::EscrowInstruction};
+use crate::{instruction::EscrowInstruction, error::EscrowError, state::Escrow};
+
 
 pub struct Processor;
 impl Processor {
@@ -39,8 +40,8 @@ impl Processor {
 
         let temp_token_account = next_account_info(account_info_iter)?;
         
-        let token_to_recieve_account = next_account_info(account_info_iter)?;\
-        if *token_to_recieve_account.owner != spl_token::id() {
+        let token_to_receive_account = next_account_info(account_info_iter)?;\
+        if *token_to_receive_account.owner != spl_token::id() {
             return Err(ProgramError::IncorrectProgramId);
         }
 
@@ -55,6 +56,16 @@ impl Processor {
         if escrow_info.is_initialized() {
             return Err(ProgramError::AccountAlreadyInitialized);
         }
+
+        escrow_info.is_initialized = true;
+        escrow_info.initializer_pubkey = *initializer.key;
+        escrow_info.temp_token_account_pubkey = *temp_token_account.key;
+        escrow_info.initializer_token_to_receive_account_pubkey = *token_to_receive_account.key;
+        escrow_info.expected_amount = amount;
+
+        Escrow::pack(escrow_info, &mut escrow_account.try_borrow_mut_data()?)?;
+
+        let (pda, _bump_seed) = Pubkey::find_program_address(&[b"escrow"], program_id);
 
         Ok(())
     }
